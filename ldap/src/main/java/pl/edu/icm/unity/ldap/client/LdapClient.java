@@ -70,8 +70,8 @@ import pl.edu.icm.unity.stdext.identity.X500Identity;
  */
 public class LdapClient
 {
-	private static final Logger log = Log.getLogger(Log.U_SERVER_LDAP, LdapClient.class);
-
+	private static final Logger log = Log.getLogger(Log.U_SERVER_LDAP_CLIENT, LdapClient.class);
+	public static final String ORIGINAL_GROUP_NAME = "originalGroupName";
 	private String idpName;
 	private LdapGroupHelper groupHelper;
 	
@@ -96,34 +96,55 @@ public class LdapClient
 			LdapClientConfiguration configuration) throws LDAPException, LdapAuthenticationException, 
 			KeyManagementException, NoSuchAlgorithmException
 	{
+		return bindAndExecute(userOrig, password, configuration, (connection, dn) -> {
+			String user = LdapUtils.extractUsername(userOrig, configuration.getUserExtractPattern());
+			SearchResultEntry entry = null;
+			try {
+				entry = findBaseEntry(configuration, dn, connection);
+				RemotelyAuthenticatedInput ret = assembleBaseResult(entry);
+				findGroupsMembership(connection, entry, configuration, ret.getGroups());
+				performAdditionalQueries(connection, configuration, user, ret);
+				return ret;
+			} catch (Exception e) {
+				log.error("LDAP operations failed");
+				throw e;
+			}
+		});
+	}
+
+	/**
+	 * Performs authentication by binding and executing specified operation(s).
+	 */
+	public RemotelyAuthenticatedInput bindAndExecute(
+		String userOrig, String password, LdapClientConfiguration configuration,
+		LdapExecFunctor<LDAPConnection, String, RemotelyAuthenticatedInput> ftor
+	) throws LDAPException, LdapAuthenticationException,
+		KeyManagementException, NoSuchAlgorithmException
+	{
 		LDAPConnection connection = createConnection(configuration);
-		
 		String user = LdapUtils.extractUsername(userOrig, configuration.getUserExtractPattern());
-		
+
 		String dn = establishUserDN(user, configuration, connection);
 		log.debug("Established user's DN is: " + dn);
-		
+
 		bindAsUser(connection, dn, password, configuration);
 		if (configuration.isBindOnly())
 		{
 			RemotelyAuthenticatedInput ret = new RemotelyAuthenticatedInput(idpName);
 			ret.addIdentity(new RemoteIdentity(dn, X500Identity.ID));
+			connection.close();
 			return ret;
 		}
-		
+
 		if (!configuration.isBindAsUser())
 			bindAsSystem(connection, configuration);
-		
-		SearchResultEntry entry = findBaseEntry(configuration, dn, connection);
-		
-		RemotelyAuthenticatedInput ret = assembleBaseResult(entry);
-		findGroupsMembership(connection, entry, configuration, ret.getGroups());
-		
-		performAdditionalQueries(connection, configuration, user, ret);
-		
+
+		RemotelyAuthenticatedInput ret = ftor.apply(connection, dn);
+
 		connection.close();
 		return ret;
 	}
+
 
 	/**
 	 * Resolves information about a given user, with all the features, but without binding as the user 
@@ -142,7 +163,7 @@ public class LdapClient
 	{
 		if (configuration.isBindAsUser())
 		{
-			log.error("LDAP verification of externaly verified credentials (as TLS verified certificates)"
+			log.error("LDAP verification of externally verified credentials (as TLS verified certificates)"
 					+ " can be only performed when the LDAP subsystem is configured to bind "
 					+ "with a system credential");
 			throw new LdapAuthenticationException("Can't authenticate");
@@ -467,6 +488,3 @@ public class LdapClient
 		}
 	}
 }
-
-
-

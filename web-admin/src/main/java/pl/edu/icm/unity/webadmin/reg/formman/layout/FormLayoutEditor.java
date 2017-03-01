@@ -214,7 +214,7 @@ public class FormLayoutEditor extends CustomComponent
 			return null;
 		return new FormLayout(entries.stream()
 				.map(entry -> entry.getEditor().getElement())
-				.collect(Collectors.toList()));
+				.collect(Collectors.<FormElement>toList()));
 	}
 	
 	public FormLayout getLayout()
