@@ -524,7 +524,7 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
                     da.add(o.toString());
                 }
             }
-            break;
+            break;         
         default:
             for (AttributeExt<?> ae : attrs)
             {
@@ -597,6 +597,9 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
                 }
             }
 
+            String MEMBER_OF_AT = "memberof";
+            String MEMBER_OF_AT_OID = "2.16.840.1.113894.1.1.424";
+            
             // iterate through requested attributes and try to match them with
             // identity attributes
             String[] aliases = configuration.getValue(
@@ -617,7 +620,35 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
                             requestDn += "," + searchContext.getDn().toString();
                         }
                         entry.setDn(requestDn);
+                    } else if(aName.equals(MEMBER_OF_AT)) {
+                        //TODO (WE): move to addAttribute?
+                        Map<String, GroupMembership> grps = identitiesMan.getGroups(new EntityParam(userEntityId));
+                        
+                        //Abuse title attribute for now
+                        //Attribute da = lsf.getAttribute(SchemaConstants.TITLE_AT, SchemaConstants.TITLE_AT_OID);
+                        Attribute da = lsf.getAttribute(MEMBER_OF_AT, MEMBER_OF_AT_OID);
+                        for (Map.Entry<String, GroupMembership> agroup : grps.entrySet()) {
+                                String group = agroup.getValue().getGroup();
+                                String[] groupParts = group.split("/");
+                                String values = "";
+                                for(int i = groupParts.length-1; i >= 0; i--) {
+                                    String g = groupParts[i];
+                                    if(!g.isEmpty()) {
+                                        values += "cn="+g+",";
+                                    }
+                                }
+                                //Remove trailing comma
+                                if(values.endsWith(",")) {
+                                    values = values.substring(0, values.length()-1);
+                                }
+                                //Add value to attribute
+                                if(!values.isEmpty()) {
+                                    da.add(values);
+                                }
+                        }
+                        entry.add(da);
                     }
+                    
                 }
             }
 
@@ -636,6 +667,7 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
             log.debug("Requested user not found: " + username, ignored);
         } catch (Exception e)
         {
+            
             throw new LdapOtherException("Error establishing user information", e);
         }
 

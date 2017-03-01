@@ -197,9 +197,50 @@ public class LdapServerFacade
                 }
             }
             zis.close();
+            
+            loadExtraMAttributeTypes(workdir);
         }
 
         return fromScratch;
+    }
+    
+    /**
+     * TODO: make this so it copies in ldiff files if they exist in some configured
+     *location
+     */
+    protected void loadExtraMAttributeTypes(String workdir) {
+        ///opt/unity-server/data/workspace/ldapServer/partitions/schema/ou=schema/cn=core/ou=attributetypes
+        File ldiffFile = new File(workdir+"/ldapServer/partitions/schema/ou=schema/cn=core/ou=attributetypes/m-oid=2.16.840.1.113894.1.1.424.ldif");
+        
+        System.out.println("Adding extra attribute types");
+        System.out.println("LdiffFile = "+ldiffFile.toString());
+        
+        PrintWriter pw = null;
+        try {
+            pw= new PrintWriter(new FileWriter(ldiffFile));
+            pw.println("version: 1");
+            pw.println("dn: m-oid=2.16.840.1.113894.1.1.424,ou=attributeTypes,cn=core,ou=schema");
+            pw.println("m-oid: 2.16.840.1.113894.1.1.424");
+            pw.println("m-name: memberof");
+            pw.println("m-description: Member of group");
+            pw.println("m-syntax: 1.3.6.1.4.1.1466.115.121.1.15");
+            pw.println("m-usage: USER_APPLICATIONS");
+            pw.println("m-supattributetype: name");
+            pw.println("m-substr: caseIgnoreSubstringsMatch");
+            pw.println("m-equality: caseIgnoreMatch");
+            pw.println("m-collective: FALSE");
+            pw.println("m-singlevalue: FALSE");
+            pw.println("m-obsolete: FALSE");
+            pw.println("m-nousermodification: FALSE");
+            pw.println("objectclass: metaAttributeType");
+            pw.println("objectclass: metaTop");
+            pw.println("objectclass: top");
+            pw.println("creatorsname: uid=admin,ou=system");
+        } catch(Exception ex) {
+            if(pw != null) {
+                pw.close();
+            }
+        }
     }
 
     /**
