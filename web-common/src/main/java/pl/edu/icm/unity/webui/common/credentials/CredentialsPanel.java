@@ -47,6 +47,7 @@ import com.vaadin.ui.HorizontalLayout;
 import com.vaadin.ui.Label;
 import com.vaadin.ui.Panel;
 import com.vaadin.ui.VerticalLayout;
+import pl.edu.icm.unity.webui.common.safehtml.HtmlConfigurableLabel;
 
 /**
  * Allows to change a credential.
@@ -70,7 +71,7 @@ public class CredentialsPanel extends VerticalLayout
 	private SafePanel statuses;
 	private MapComboBox<CredentialDefinition> credential;
 	private Label status;
-	private Label description;
+	private HtmlConfigurableLabel description;
 	private SafePanel credentialStateInfo;
 	private SafePanel editor;
 	private Button update;
@@ -136,7 +137,7 @@ public class CredentialsPanel extends VerticalLayout
 				updateSelectedCredential();
 			}
 		});
-		description = new Label();
+		description = new HtmlConfigurableLabel();
 		description.setCaption(msg.getMessage("CredentialChangeDialog.description"));
 		status = new Label();
 		status.setCaption(msg.getMessage("CredentialChangeDialog.status"));
