@@ -105,7 +105,7 @@ public class EnumAttributeHandler implements WebAttributeHandler<String>, WebAtt
 			if (value != null)
 				field.setValue(value);
 			else if (required)
-				field.setValue(syntax.getAllowed().iterator().next());
+				field.setValue(sortedAllowed.get(0));
 			return new ComponentsContainer(field);
 		}
 
