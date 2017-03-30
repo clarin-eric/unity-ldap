@@ -37,6 +37,9 @@ import com.vaadin.ui.Label;
 import com.vaadin.ui.Table;
 import com.vaadin.ui.TextField;
 import com.vaadin.ui.VerticalLayout;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Enum attribute handler for the web
@@ -94,8 +97,10 @@ public class EnumAttributeHandler implements WebAttributeHandler<String>, WebAtt
 			field = new ComboBox(label);
 			field.setNullSelectionAllowed(!required);
 			field.setRequired(required);
-			field.setTextInputAllowed(false);
-			for (String allowed: syntax.getAllowed())
+			field.setTextInputAllowed(true);
+                        List<String> sortedAllowed = new ArrayList<>(syntax.getAllowed());
+                        Collections.sort(sortedAllowed);
+			for (String allowed: sortedAllowed)
 				field.addItem(allowed);
 			if (value != null)
 				field.setValue(value);
@@ -150,7 +155,9 @@ public class EnumAttributeHandler implements WebAttributeHandler<String>, WebAtt
 		allowedTable.addContainerProperty(msg.getMessage("EnumAttributeHandler.allowed"), 
 				String.class, null);
 		EnumAttributeSyntax syntax = (EnumAttributeSyntax) syntaxR;
-		for (String allowed: syntax.getAllowed())
+                List<String> sortedAllowed = new ArrayList<>(syntax.getAllowed());
+                Collections.sort(sortedAllowed);
+		for (String allowed: sortedAllowed)
 			allowedTable.addItem(new Object[] {allowed}, allowed);
 		allowedTable.setReadOnly(true);
 		
@@ -217,7 +224,9 @@ public class EnumAttributeHandler implements WebAttributeHandler<String>, WebAtt
 			
 			if (initial != null)
 			{
-				for (String a: initial.getAllowed())
+                                List<String> sortedAllowed = new ArrayList<>(initial.getAllowed());
+                                Collections.sort(sortedAllowed);
+				for (String a: sortedAllowed)
 					current.addItem(new Object[] {a}, a);
 			}
 			return vl;
