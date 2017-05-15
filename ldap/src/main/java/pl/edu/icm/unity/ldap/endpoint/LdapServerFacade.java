@@ -242,7 +242,6 @@ public class LdapServerFacade
             }
         }
         
-        
         File ldiffFileCn = new File(workdir+"/ldapServer/partitions/schema/ou=schema/cn=system/ou=attributetypes/m-oid=2.5.4.3.ldif");
         System.out.println("Updating common name definition");
         if(ldiffFileCn.exists()) {
