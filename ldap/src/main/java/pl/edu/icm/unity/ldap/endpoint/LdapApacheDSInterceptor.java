@@ -648,7 +648,6 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
                 for (AttributeTypeOptions ao : attributes)
                 {
                     String aName = ao.getAttributeType().getName();
-                    //addAttribute(aName, userEntity, username, attrs, entry);
                     if (aName.equals(alias))
                     {
                         String requestDn = String.format("%s=%s", alias, username);
@@ -658,41 +657,11 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
                             requestDn += "," + searchContext.getDn().toString();
                         }
                         entry.setDn(requestDn);
-                    }/* else if(aName.equals(MEMBER_OF_AT)) {
-                        //TODO (WE): move to addAttribute?
-                        Map<String, GroupMembership> grps = identitiesMan.getGroups(new EntityParam(userEntityId));
-                        
-                        //Abuse title attribute for now
-                        //Attribute da = lsf.getAttribute(SchemaConstants.TITLE_AT, SchemaConstants.TITLE_AT_OID);
-                        Attribute da = lsf.getAttribute(MEMBER_OF_AT, MEMBER_OF_AT_OID);
-                        for (Map.Entry<String, GroupMembership> agroup : grps.entrySet()) {
-                                String group = agroup.getValue().getGroup();
-                                String[] groupParts = group.split("/");
-                                String values = "";
-                                for(int i = groupParts.length-1; i >= 0; i--) {
-                                    String g = groupParts[i];
-                                    if(!g.isEmpty()) {
-                                        values += "cn="+g+",";
-                                    }
-                                }
-                                //Remove trailing comma
-                                if(values.endsWith(",")) {
-                                    values = values.substring(0, values.length()-1);
-                                }
-                                //Add value to attribute
-                                if(!values.isEmpty()) {
-                                    da.add(values);
-                                }
-                        }
-                        entry.add(da);
-                    }*/
-                    else {
+                    } else {
                         addAttribute(aName, userEntity, username, attrs, entry);
                     }
                 }
             }
-            
-            
 
             // the purpose of a search can be to get DN (from another attribute)
             //  - even if no attributes are in getReturningAttributes()
@@ -741,9 +710,10 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
         if (value != null) {
             Attribute da = lsf.getAttribute(uid, upId);
             da.add(value);
+            log.debug(String.format("Mapped unity attribute [%s] to ldap attribute [%s/%s] with value: %s.", attributeName, uid, upId, value));
             return da;
         } else {
-            log.warn(String.format("Failed to map unity attribute [%s] to ldap attribute [%s]. Cause: unity attribute not found.", attributeName, upId));
+            log.warn(String.format("Failed to map unity attribute [%s] to ldap attribute [%s/%s]. Cause: unity attribute not found.", attributeName, uid, upId));
             String availableAttributes = "";
             for (AttributeExt<?> ae : unityAttrs) {
                 availableAttributes += ae.getName()+",";                 
@@ -779,9 +749,10 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
         if (id != null) {
             Attribute da = lsf.getAttribute(uid, upId);
             da.add(id.getValue());
+            log.debug(String.format("Mapped unity identity of type [%s] to ldap attribute [%s/%s] with value: %s.", identityTypeId, uid, upId, id.getValue()));
             return da;
         } else {
-            log.warn(String.format("Failed to map unity identity to ldap attribute [%s]. Cause: no unity identity of type %s found.", upId, identityTypeId));
+            log.warn(String.format("Failed to map unity identity to ldap attribute [%s/%s]. Cause: no unity identity of type %s found.", uid, upId, identityTypeId));
             String availableIdentities = "";
             for(Identity identity : userEntity.getIdentities()) {
                 availableIdentities += identity.getTypeId() + ",";
