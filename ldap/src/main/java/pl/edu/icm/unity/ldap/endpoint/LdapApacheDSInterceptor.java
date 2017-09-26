@@ -289,79 +289,21 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
 	setUnityInvocationContext(session.getSession());
 	try
 	{
-            // admin bind will not return true (we look for cn)
-            //boolean userSearch = LdapNodeUtils.isUserSearch(
-            //                configuration, searchContext.getFilter()
-            //                );
-
             List<Entry> entries = new ArrayList<>();
             ExprNode rootNode = searchContext.getFilter();
             handleSearchNode(searchContext, rootNode, entries);
             
             if (entries.isEmpty()) {
-		//return next(searchContext);
                 return emptyResult(searchContext);
             } else {
                 return new EntryFilteringCursorImpl(
                     new ListCursor<>(entries), searchContext, this.schemaManager
                 );
             }
-            
-/*                    
-            // e.g., search by mail
-            if (userSearch)
-            {
-                String username = LdapNodeUtils.getUserName(
-                    configuration, searchContext.getFilter()
-                );
-                if (null == username) {
-                    return emptyResult(searchContext);
-                }
-                return getUnityUser(searchContext, username);
-            }
-
-            String username = LdapNodeUtils.parseGroupOfNamesSearch(
-                schemaManager, configuration, searchContext.getFilter()
-            );
-            if (null != username) {
-                long userEntityId;
-                try {
-                    userEntityId = userMapper.resolveUser(username, realm.getName());
-                    Map<String, GroupMembership> grps = identitiesMan.getGroups(
-                        new EntityParam(userEntityId)
-                    );
-                    String return_format = configuration.getValue(
-                        LdapServerProperties.GROUP_OF_NAMES_RETURN_FORMAT
-                    );
-                    if (null == return_format) {
-                        throw new LdapOtherException("Configuration error in GROUP_OF_NAMES_RETURN_FORMAT");
-                    }
-
-                    List<Entry> entryl = new ArrayList<>();
-                    for (Map.Entry<String, GroupMembership> agroup : grps.entrySet()) {
-                        Entry e = new DefaultEntry(lsf.getDs().getSchemaManager());
-                        e.setDn(String.format(return_format, agroup.getKey()));
-                        entryl.add(e);
-                    }
-                    ListCursor<Entry> lc = new ListCursor<>(entryl);
-                    EntryFilteringCursor ec = new EntryFilteringCursorImpl(
-                        lc, searchContext, this.schemaManager
-                    );
-                    return ec;
-                } catch (EngineException e) {
-                    throw new LdapOtherException("Error when searching", e);
-                }
-            }
-
-
-		EntryFilteringCursor ec = next(searchContext);
-		return ec;
-*/
 	} finally
 	{
 		InvocationContext.setCurrent(null);
 	}
-            
     }
 
     @Override
