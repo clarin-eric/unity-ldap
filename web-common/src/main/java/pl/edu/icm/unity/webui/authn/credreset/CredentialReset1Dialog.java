@@ -57,9 +57,9 @@ public class CredentialReset1Dialog extends AbstractDialog
 		ret.addComponent(new Label(msg.getMessage("CredentialReset.info")));
 		FormLayout form = new FormLayout();
 		username = new TextField(msg.getMessage("CredentialReset.username"));
-		captcha = new CaptchaComponent(msg);
+		//captcha = new CaptchaComponent(msg);
 		form.addComponent(username);
-		captcha.addToFormLayout(form);
+		//captcha.addToFormLayout(form);
 		ret.addComponent(form);
 		return ret;
 	}
@@ -77,6 +77,7 @@ public class CredentialReset1Dialog extends AbstractDialog
 			return;
 		}
 		username.setComponentError(null);
+                /*
 		try
 		{
 			captcha.verify();
@@ -84,7 +85,7 @@ public class CredentialReset1Dialog extends AbstractDialog
 		{
 			return;
 		}
-
+                */
 		close();
 		backend.setSubject(new IdentityTaV(UsernameIdentity.ID, user));
 		CredentialResetStateVariable.inc(); //ok - username (maybe invalid but anyway) and captcha are provided.
