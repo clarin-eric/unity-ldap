@@ -26,6 +26,10 @@ import org.apache.directory.api.ldap.model.exception.LdapAuthenticationException
 import org.apache.directory.api.ldap.model.exception.LdapException;
 import org.apache.directory.api.ldap.model.exception.LdapOtherException;
 import org.apache.directory.api.ldap.model.exception.LdapUnwillingToPerformException;
+import org.apache.directory.api.ldap.model.filter.AndNode;
+import org.apache.directory.api.ldap.model.filter.BranchNode;
+import org.apache.directory.api.ldap.model.filter.ExprNode;
+import org.apache.directory.api.ldap.model.filter.OrNode;
 import org.apache.directory.api.ldap.model.message.ResultCodeEnum;
 import org.apache.directory.api.ldap.model.name.Dn;
 import org.apache.directory.api.ldap.model.schema.AttributeType;
@@ -208,6 +212,64 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
         return next(lookupContext);
     }
 
+    
+    protected void handleSearchNode(SearchOperationContext searchContext, ExprNode node, List<Entry> entries) throws LdapException {
+        //TODO: handle all node types    
+        if (node instanceof OrNode) {
+            for( ExprNode childNode : ((OrNode)node).getChildren()) {
+                handleSearchNode(searchContext, childNode, entries);
+            }                
+        } else if (node instanceof AndNode) {
+            log.warn("And operator not supported");
+        } else if (node.isLeaf()) {
+            handleLeafNode(searchContext, node, entries);
+        } else {
+            log.warn("Operator not supported");
+        }
+    }
+    
+    protected void handleLeafNode(SearchOperationContext searchContext, ExprNode node, List<Entry> entries) throws LdapException {
+        // admin bind will not return true (we look for cn)
+        boolean userSearch = LdapNodeUtils.isUserSearch(configuration, node);
+        
+        // e.g., search by mail
+        if (userSearch)
+        {
+            String username = LdapNodeUtils.getUserName(configuration, node);
+            if (null == username) {
+                return;
+            }
+            entries.add(getUnityUserEntry(searchContext, username));
+        } else {
+            String username = LdapNodeUtils.parseGroupOfNamesSearch(
+                schemaManager, configuration, node
+            );
+            if (null != username) {
+                long userEntityId;
+                try {
+                    userEntityId = userMapper.resolveUser(username, realm.getName());
+                    Map<String, GroupMembership> grps = identitiesMan.getGroups(
+                        new EntityParam(userEntityId)
+                    );
+                    String return_format = configuration.getValue(
+                        LdapServerProperties.GROUP_OF_NAMES_RETURN_FORMAT
+                    );
+                    if (null == return_format) {
+                        throw new LdapOtherException("Configuration error in GROUP_OF_NAMES_RETURN_FORMAT");
+                    }
+
+                    for (Map.Entry<String, GroupMembership> agroup : grps.entrySet()) {
+                        Entry e = new DefaultEntry(lsf.getDs().getSchemaManager());
+                        e.setDn(String.format(return_format, agroup.getKey()));
+                        entries.add(e);
+                    }                   
+                } catch (EngineException e) {
+                    throw new LdapOtherException("Error when searching", e);
+                }
+            }
+        }
+    }
+    
     /**
      * Search operation is very limited in respect to complete LDAP.
      *
@@ -227,59 +289,17 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
 	setUnityInvocationContext(session.getSession());
 	try
 	{
-            // admin bind will not return true (we look for cn)
-            boolean userSearch = LdapNodeUtils.isUserSearch(
-                            configuration, searchContext.getFilter()
-                            );
-
-            // e.g., search by mail
-            if (userSearch)
-            {
-                String username = LdapNodeUtils.getUserName(
-                    configuration, searchContext.getFilter()
+            List<Entry> entries = new ArrayList<>();
+            ExprNode rootNode = searchContext.getFilter();
+            handleSearchNode(searchContext, rootNode, entries);
+            
+            if (entries.isEmpty()) {
+                return emptyResult(searchContext);
+            } else {
+                return new EntryFilteringCursorImpl(
+                    new ListCursor<>(entries), searchContext, this.schemaManager
                 );
-                if (null == username) {
-                    return emptyResult(searchContext);
-                }
-                return getUnityUser(searchContext, username);
             }
-
-            String username = LdapNodeUtils.parseGroupOfNamesSearch(
-                schemaManager, configuration, searchContext.getFilter()
-            );
-            if (null != username) {
-                long userEntityId;
-                try {
-                    userEntityId = userMapper.resolveUser(username, realm.getName());
-                    Map<String, GroupMembership> grps = identitiesMan.getGroups(
-                        new EntityParam(userEntityId)
-                    );
-                    String return_format = configuration.getValue(
-                        LdapServerProperties.GROUP_OF_NAMES_RETURN_FORMAT
-                    );
-                    if (null == return_format) {
-                        throw new LdapOtherException("Configuration error in GROUP_OF_NAMES_RETURN_FORMAT");
-                    }
-
-                    List<Entry> entryl = new ArrayList<>();
-                    for (Map.Entry<String, GroupMembership> agroup : grps.entrySet()) {
-                        Entry e = new DefaultEntry(lsf.getDs().getSchemaManager());
-                        e.setDn(String.format(return_format, agroup.getKey()));
-                        entryl.add(e);
-                    }
-                    ListCursor<Entry> lc = new ListCursor<>(entryl);
-                    EntryFilteringCursor ec = new EntryFilteringCursorImpl(
-                        lc, searchContext, this.schemaManager
-                    );
-                    return ec;
-                } catch (EngineException e) {
-                    throw new LdapOtherException("Error when searching", e);
-                }
-            }
-
-
-		EntryFilteringCursor ec = next(searchContext);
-		return ec;
 	} finally
 	{
 		InvocationContext.setCurrent(null);
@@ -596,11 +616,11 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
             toEntry.add(da);
         }
     }
-
-    /**
+    
+     /**
      * Get Unity user from LDAP search context.
      */
-    private EntryFilteringCursor getUnityUser(SearchOperationContext searchContext, String username)
+    private Entry getUnityUserEntry(SearchOperationContext searchContext, String username)
             throws LdapException
     {
         Entry entry = new DefaultEntry(lsf.getDs().getSchemaManager());
@@ -669,13 +689,99 @@ public class LdapApacheDSInterceptor extends BaseInterceptor
                 entry.setDn(searchContext.getDn());
             }
 
-            return new EntryFilteringCursorImpl(new SingletonCursor<>(entry),
-                    searchContext, lsf.getDs().getSchemaManager()
-            );
-
+            return entry;
         } catch (IllegalIdentityValueException ignored)
         {
             log.warn("Requested user not found: " + username, ignored);
+        } catch (Exception e)
+        {
+            
+            throw new LdapOtherException("Error establishing user information", e);
+        }
+
+        return null;//emptyResult(searchContext);
+    }
+
+    /**
+     * Get Unity user from LDAP search context.
+     */
+    private EntryFilteringCursor getUnityUser(SearchOperationContext searchContext, String username)
+            throws LdapException
+    {
+        //Entry entry = new DefaultEntry(lsf.getDs().getSchemaManager());
+        try
+        {
+            /*
+            long userEntityId = userMapper.resolveUser(username, realm.getName());
+            
+            Entity userEntity = identitiesMan.getEntity(new EntityParam(userEntityId));
+            for(Identity identity : userEntity.getIdentities()) {
+                identity.getType();
+            }
+            
+            
+            // get attributes if any
+            Collection<AttributeExt<?>> attrs = attributesMan.getAttributes(
+                new EntityParam(userEntityId), null, null
+            );
+
+            Set<AttributeTypeOptions> attributes = new HashSet<AttributeTypeOptions>();
+            if (null != searchContext.getReturningAttributes())
+            {
+                attributes.addAll(searchContext.getReturningAttributes());
+            } else
+            {
+                String default_attributes = configuration.getValue(
+                    LdapServerProperties.RETURNED_USER_ATTRIBUTES
+                );
+                for (String at : default_attributes.split(","))
+                {
+                    attributes.add(
+                        new AttributeTypeOptions(
+                            schemaManager.lookupAttributeTypeRegistry(at.trim())
+                        )
+                    );
+                }
+            }
+
+            // iterate through requested attributes and try to match them with
+            // identity attributes
+            String[] aliases = configuration.getValue(
+                LdapServerProperties.USER_NAME_ALIASES
+            ).split(",");
+            for (String alias : aliases)
+            {
+                for (AttributeTypeOptions ao : attributes)
+                {
+                    String aName = ao.getAttributeType().getName();
+                    if (aName.equals(alias))
+                    {
+                        String requestDn = String.format("%s=%s", alias, username);
+                        // FIXME: is this what we want in all cases?
+                        if (null != searchContext.getDn())
+                        {
+                            requestDn += "," + searchContext.getDn().toString();
+                        }
+                        entry.setDn(requestDn);
+                    } else {
+                        addAttribute(aName, userEntity, username, attrs, entry);
+                    }
+                }
+            }
+
+            // the purpose of a search can be to get DN (from another attribute)
+            //  - even if no attributes are in getReturningAttributes()
+            if (null == entry.getDn() || entry.getDn().isEmpty() ) {
+                entry.setDn(searchContext.getDn());
+            }
+            */
+            Entry userEntry = getUnityUserEntry(searchContext, username);
+            if (userEntry != null) {
+                return new EntryFilteringCursorImpl(new SingletonCursor<>(userEntry),
+                        searchContext, lsf.getDs().getSchemaManager()
+                );
+            }
+
         } catch (Exception e)
         {
             
